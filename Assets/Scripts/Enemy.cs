@@ -3,6 +3,7 @@ using UnityEngine;
 public class Enemy : MonoBehaviour
 {
     public float fallSpeed = 5f;
+    [SerializeField] private GameObject explosionPrefab;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -32,6 +33,8 @@ public class Enemy : MonoBehaviour
         }
         else if(collision.CompareTag("Bullet"))
         {
+            Instantiate(explosionPrefab,transform.position,Quaternion.identity);
+
             GameManager.instance.AddScore(100);
             Destroy(gameObject);
         }

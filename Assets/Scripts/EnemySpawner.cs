@@ -58,5 +58,8 @@ public class EnemySpawner : MonoBehaviour
         float y = leftTop.y + 2f;
 
         Instantiate(enemyPrefab,new Vector3(x,y,0),Quaternion.identity);
+
+        float scale = UnityEngine.Random.Range(0.5f, 1.5f);
+        enemyPrefab.transform.localScale = Vector3.one * scale;
     }
 }

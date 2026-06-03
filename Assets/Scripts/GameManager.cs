@@ -29,6 +29,8 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private TextMeshProUGUI countdownText;
 
+    [SerializeField] private AudioClip gameBgm;
+
     private void Awake()
     {
         if (instance != null && instance != this)
@@ -100,6 +102,8 @@ public class GameManager : MonoBehaviour
         startTiem = Time.time;
 
         FindObjectOfType<MobileInputVisualizer>().EnableInput();
+
+        BGMManager.instance.PlayBGM(gameBgm);
     }
 
     public void TryClear()
@@ -160,7 +164,7 @@ public class GameManager : MonoBehaviour
     public void BackTitle()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene("Title");
+        SceneManager.LoadScene("TitleScene");
     }
 
     public void OnEnemyDefeated()
