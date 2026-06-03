@@ -1,0 +1,316 @@
+using System;
+using System.Collections;
+using Unity.VisualScripting;
+using UnityEngine;
+
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.EnhancedTouch;
+using UnityEngine.Rendering;
+using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
+
+public class MobileInputVisualizer : MonoBehaviour
+{
+    [SerializeField]
+    private float swipeDistance = 80f;
+
+    private Vector2 startPosition;
+    private Vector2 currentPosition;
+
+    private bool isTouching;
+
+    private string currentState = "None";
+
+    [SerializeField] GameObject ReadyMissile;
+
+    //[Header("矢印")]
+    //[SerializeField] private Transform arrow;
+
+    [SerializeField] private Bullet bulletprefab;
+    [SerializeField] private Transform firePoint;
+
+    [SerializeField] private float shootCooldown = 0.2f;
+
+    [SerializeField] private float minFlickDistance = 100f;
+    [SerializeField] private float maxFlickTime = 0.3f;
+
+    private float startTime;
+
+    private bool canShoot = true;
+    private bool canInput = false;
+    private bool ignoreNextRelease = false;
+
+    void OnEnable()
+    {
+        EnhancedTouchSupport.Enable();
+    }
+
+    void OnDisable()
+    {
+        EnhancedTouchSupport.Disable();
+    }
+
+    private void Start()
+    {
+        EnableInput();
+    }
+
+    void Update()
+    {
+#if UNITY_EDITOR
+
+        UpdateMouseInput();
+
+#else
+
+        UpdateTouchInput();
+
+#endif
+
+        //if(isTouching )
+        //{
+        //    arrow.gameObject.SetActive( true );
+        //    Vector2 diff = startPosition - currentPosition;
+
+        //    float angle = Mathf.Atan2 ( diff.y, diff.x ) * Mathf.Rad2Deg;
+
+        //    arrow.rotation = Quaternion.Euler(0, 0, angle);
+
+        //    float length = Mathf.Clamp(diff.magnitude * 0.1f, 0.5f, 2f);
+
+        //    arrow.localScale = new Vector3( length, 1f, 1f);
+        //}
+        //else
+        //{
+        //    arrow.gameObject.SetActive ( false );
+        //}
+    }
+
+    void UpdateMouseInput()
+    {
+        if (Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            startPosition = Mouse.current.position.ReadValue();
+            currentPosition = startPosition;
+
+            startTime = Time.time;
+
+            isTouching = true;
+        }
+
+        if (Mouse.current.leftButton.isPressed)
+        {
+            currentPosition = Mouse.current.position.ReadValue();
+        }
+
+        if (Mouse.current.leftButton.wasReleasedThisFrame)
+        {
+
+            if(ignoreNextRelease)
+            {
+                ignoreNextRelease = false;
+                isTouching = false;
+                return;
+            }
+
+            currentPosition = Mouse.current.position.ReadValue();
+
+            CheckGesture();
+
+            isTouching = false;
+        }
+    }
+
+    void UpdateTouchInput()
+    {
+        if (Touch.activeTouches.Count == 0)
+        {
+            return;
+        }
+
+        Touch touch = Touch.activeTouches[0];
+
+        if (touch.phase == UnityEngine.InputSystem.TouchPhase.Began)
+        {
+            // 最初に触った位置を保存
+            startPosition = touch.screenPosition;
+
+            // 現在の指位置を更新
+            currentPosition = startPosition;
+
+            startTime = Time.time;
+
+            isTouching = true;
+        }
+
+        if (touch.phase == UnityEngine.InputSystem.TouchPhase.Moved)
+        {
+            currentPosition = touch.screenPosition;
+        }
+
+        if (touch.phase == UnityEngine.InputSystem.TouchPhase.Ended)
+        {
+            if (ignoreNextRelease)
+            {
+                ignoreNextRelease = false;
+                isTouching = false;
+                return;
+            }
+            currentPosition = touch.screenPosition;
+
+            CheckGesture();
+
+            isTouching = false;
+        }
+    }
+
+    void CheckGesture()
+    {
+        if (!canInput) return;
+
+        if (!canShoot) return;
+
+        Vector2 diff = currentPosition - startPosition;
+
+        float distance = diff.magnitude;
+        float flickTime = Time.time - startTime;
+
+        // 距離不足
+        if (distance < minFlickDistance)
+            return;
+
+        // ゆっくり動かした
+        if (flickTime > maxFlickTime)
+            return;
+
+        Vector2 dir = diff.normalized;
+
+        Bullet bullet = Instantiate(bulletprefab, firePoint.position, Quaternion.identity);
+
+        ReadyMissile.SetActive(false);
+
+        bullet.Init(dir);
+
+        StartCoroutine(ShootCooldown());
+
+        canShoot = false;
+    }
+
+    private IEnumerator ShootCooldown()
+    {
+        canShoot = false;
+
+        yield return new WaitForSeconds(shootCooldown);
+
+        ReadyMissile.SetActive(true);
+
+        canShoot = true;
+    }
+
+    void OnGUI()
+    {
+        GUIStyle style = new GUIStyle(GUI.skin.label);
+
+        style.fontSize = 32;
+        style.normal.textColor = Color.white;
+
+        if (isTouching)
+        {
+            DrawPoint(currentPosition, 30, Color.white);
+
+            DrawLine(
+                startPosition,
+                currentPosition,
+                Color.yellow,
+                5f
+            );
+        }
+    }
+
+    void DrawPoint(Vector2 position, float size, Color color)
+    {
+        Rect rect = new Rect(
+            position.x - size / 2,
+            Screen.height - position.y - size / 2,
+            size,
+            size
+        );
+
+        GUI.color = color;
+        GUI.Box(rect, "");
+    }
+
+    void DrawLine(Vector2 start, Vector2 end, Color color, float width)
+    {
+        Matrix4x4 matrix = GUI.matrix;
+
+        Vector2 guiStart = new Vector2(
+            start.x,
+            Screen.height - start.y
+        );
+
+        Vector2 guiEnd = new Vector2(
+            end.x,
+            Screen.height - end.y
+        );
+
+        float angle =
+            Vector3.Angle(
+                guiEnd - guiStart,
+                Vector2.right
+            );
+
+        if (guiStart.y > guiEnd.y)
+        {
+            angle = -angle;
+        }
+
+        float length =
+            (guiEnd - guiStart).magnitude;
+
+        GUI.color = color;
+
+        GUIUtility.RotateAroundPivot(
+            angle,
+            guiStart
+        );
+
+        GUI.DrawTexture(
+            new Rect(
+                guiStart.x,
+                guiStart.y,
+                length,
+                width
+            ),
+            Texture2D.whiteTexture
+        );
+
+        GUI.matrix = matrix;
+    }
+
+    public void SetCanShoot(bool value)
+    {
+        canShoot = value;
+    }
+
+    public void EnableInput()
+    {
+        ignoreNextRelease = true;
+
+        isTouching = false;
+
+        startPosition = Vector2.zero;
+        currentPosition = Vector2.zero;
+
+        StartCoroutine(EnableInputCoroutine());
+    }
+
+    private IEnumerator EnableInputCoroutine()
+    {
+        canInput = false;
+
+        yield return null; // 2フレーム待つ
+        yield return null; 
+
+        canInput = true;
+    }
+}
